@@ -1,9 +1,9 @@
+use crate::simple::{ModSettings, ModSettingsValue};
 use crate::types::FactorioVersion;
 use anyhow::anyhow;
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
 use std::io::{Read, Write};
-use crate::simple::{ModSettings, ModSettingsValue};
 
 const TYPE_NONE: u8 = 0;
 const TYPE_BOOL: u8 = 1;
@@ -177,18 +177,57 @@ impl Settings {
                 ModSettingsValue::String(s) => PropertyValue::String(s.clone()),
                 ModSettingsValue::Color { r, g, b, a } => {
                     let mut color_map = IndexMap::with_capacity(4);
-                    color_map.insert("r".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*r) });
-                    color_map.insert("g".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*g) });
-                    color_map.insert("b".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*b) });
-                    color_map.insert("a".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*a) });
+                    color_map.insert(
+                        "r".to_owned(),
+                        Property {
+                            any_flag: false,
+                            value: PropertyValue::Number(*r),
+                        },
+                    );
+                    color_map.insert(
+                        "g".to_owned(),
+                        Property {
+                            any_flag: false,
+                            value: PropertyValue::Number(*g),
+                        },
+                    );
+                    color_map.insert(
+                        "b".to_owned(),
+                        Property {
+                            any_flag: false,
+                            value: PropertyValue::Number(*b),
+                        },
+                    );
+                    color_map.insert(
+                        "a".to_owned(),
+                        Property {
+                            any_flag: false,
+                            value: PropertyValue::Number(*a),
+                        },
+                    );
                     PropertyValue::Dictionary(color_map)
                 }
             };
             let mut inner_props_map = IndexMap::with_capacity(1);
-            inner_props_map.insert("value".to_owned(), Property { any_flag: false, value: prop_value });
-            properties.insert(key.clone(), Property { any_flag: false, value: PropertyValue::Dictionary(inner_props_map) });
+            inner_props_map.insert(
+                "value".to_owned(),
+                Property {
+                    any_flag: false,
+                    value: prop_value,
+                },
+            );
+            properties.insert(
+                key.clone(),
+                Property {
+                    any_flag: false,
+                    value: PropertyValue::Dictionary(inner_props_map),
+                },
+            );
         }
-        Property { any_flag: false, value: PropertyValue::Dictionary(properties) }
+        Property {
+            any_flag: false,
+            value: PropertyValue::Dictionary(properties),
+        }
     }
 
     pub fn from_simple(simple: &ModSettings) -> Settings {
@@ -198,11 +237,17 @@ impl Settings {
 
         let mut root_map = IndexMap::new();
         root_map.insert("startup".to_owned(), startup_properties);
-        root_map.insert("runtime-global".to_owned(), runtime_properties );
-        root_map.insert("runtime-per-user".to_owned(), runtime_per_user_properties );
+        root_map.insert("runtime-global".to_owned(), runtime_properties);
+        root_map.insert("runtime-per-user".to_owned(), runtime_per_user_properties);
 
-        let root = Property { any_flag: false, value: PropertyValue::Dictionary(root_map) };
-        Settings { properties: root, version: simple.factorio_version }
+        let root = Property {
+            any_flag: false,
+            value: PropertyValue::Dictionary(root_map),
+        };
+        Settings {
+            properties: root,
+            version: simple.factorio_version,
+        }
     }
 }
 
@@ -403,7 +448,7 @@ mod tests {
         let settings = Settings::decode(&mut cursor).expect("Decoding settings");
 
         let encoded_data = {
-            let mut vec = Vec::<u8>::with_capacity(data.capacity());
+            let vec = Vec::<u8>::with_capacity(data.capacity());
             let mut cursor = Cursor::new(vec);
             settings.encode(&mut cursor).expect("Encoding settings");
             cursor.into_inner()
