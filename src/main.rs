@@ -1,8 +1,8 @@
-use std::io::{BufRead, Write};
-use std::io::Read;
 use anyhow::anyhow;
-use byteorder::{LE, ReadBytesExt, WriteBytesExt};
+use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
+use std::io::Read;
+use std::io::Write;
 
 struct FactorioVersion {
     pub major: u16,
@@ -12,7 +12,7 @@ struct FactorioVersion {
 }
 
 impl Codec for FactorioVersion {
-    fn decode(input: &mut (impl Read)) -> anyhow::Result<FactorioVersion> {
+    fn decode(input: &mut impl Read) -> anyhow::Result<FactorioVersion> {
         let [major, minor, patch, build] = {
             let mut vers = [0; 4];
             input.read_u16_into::<LE>(&mut vers)?;
@@ -22,11 +22,11 @@ impl Codec for FactorioVersion {
             major,
             minor,
             patch,
-            build
+            build,
         })
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
         writer.write_u16::<LE>(self.major)?;
         writer.write_u16::<LE>(self.minor)?;
         writer.write_u16::<LE>(self.patch)?;
@@ -50,7 +50,7 @@ enum PropertyValue {
 }
 
 impl Codec for Property {
-    fn decode(input: &mut (impl Read)) -> anyhow::Result<Property> {
+    fn decode(input: &mut impl Read) -> anyhow::Result<Property> {
         let [vtype, any_flag] = {
             let mut tree_header = [0; 2];
             input.read_exact(&mut tree_header)?;
@@ -63,12 +63,15 @@ impl Codec for Property {
             3 => PropertyValue::String(Codec::decode(input)?),
             4 => PropertyValue::List(Codec::decode(input)?),
             5 => PropertyValue::Dictionary(Codec::decode(input)?),
-            _ => return Err(anyhow!("Unknown type"))
+            _ => return Err(anyhow!("Unknown type")),
         };
-        Ok(Property { any_flag: loose_bool(any_flag), value })
+        Ok(Property {
+            any_flag: loose_bool(any_flag),
+            value,
+        })
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
@@ -79,11 +82,11 @@ struct Settings {
 }
 
 impl Codec for Settings {
-    fn decode(input: &mut (impl Read)) -> anyhow::Result<Settings> {
+    fn decode(_input: &mut impl Read) -> anyhow::Result<Settings> {
         todo!()
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
@@ -93,36 +96,38 @@ fn main() {
 }
 
 trait Codec: Sized {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self>;
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()>;
+    fn decode(reader: &mut impl Read) -> anyhow::Result<Self>;
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()>;
 }
 
 impl Codec for bool {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self> {
-        reader.read_u8()
-            .map(|a| loose_bool(a))
-            .map_err(|a| a.into())
+    fn decode(reader: &mut impl Read) -> anyhow::Result<Self> {
+        reader
+            .read_u8()
+            .map(loose_bool)
+            .map_err(anyhow::Error::from)
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
 
 impl Codec for f64 {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self> {
+    fn decode(reader: &mut impl Read) -> anyhow::Result<Self> {
         Ok(reader.read_f64::<LE>()?)
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
 
 impl Codec for String {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self> {
+    fn decode(reader: &mut impl Read) -> anyhow::Result<Self> {
         let empty_byte = reader.read_u8()?;
-        if !loose_bool(empty_byte) { // if not empty
+        if !loose_bool(empty_byte) {
+            // if not empty
             let length = read_optimized_u32(reader)?;
             let mut vec = vec![0; length as usize];
             reader.read_exact(&mut vec[..])?;
@@ -132,41 +137,38 @@ impl Codec for String {
         }
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
 
 impl Codec for Vec<Property> {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self> {
+    fn decode(_reader: &mut impl Read) -> anyhow::Result<Self> {
         todo!()
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
 
 impl Codec for IndexMap<String, Property> {
-    fn decode(reader: &mut (impl Read)) -> anyhow::Result<Self> {
+    fn decode(_reader: &mut impl Read) -> anyhow::Result<Self> {
         todo!()
     }
 
-    fn encode(&self, writer: &mut (impl Write)) -> anyhow::Result<()> {
+    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
         todo!()
     }
 }
 
 #[inline]
 const fn loose_bool(input: u8) -> bool {
-    match input {
-        1 => true,
-        _ => false,
-    }
+    matches!(input, 1)
 }
 
 #[inline]
-fn read_optimized_u32(reader: &mut (impl Read)) -> anyhow::Result<u32> {
+fn read_optimized_u32(reader: &mut impl Read) -> anyhow::Result<u32> {
     Ok(match reader.read_u8()? {
         0xff => reader.read_u32::<LE>()?,
         byte => byte as u32,
