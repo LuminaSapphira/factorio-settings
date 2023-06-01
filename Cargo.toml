@@ -9,6 +9,9 @@ edition = "2021"
 anyhow = "1.0.71"
 byteorder = "1.4.3"
 hex-literal = "0.4.1"
-indexmap = "1.9.3"
+indexmap = { version = "1.9.3", features = ["serde"] }
 nom = "7.1.3"
+serde = { version = "1.0.163", features = ["derive"] }
+serde_json = { version = "1.0.96", features = ["preserve_order"] }
 thiserror = "1.0.40"
+toml = { version = "0.7.4", features = ["preserve_order"] }
