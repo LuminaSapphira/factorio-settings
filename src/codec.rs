@@ -45,7 +45,6 @@ pub enum PropertyValue {
 }
 
 impl PropertyValue {
-
     pub fn as_bool(&self) -> Option<&bool> {
         match self {
             Self::Bool(b) => Some(b),
@@ -232,7 +231,7 @@ mod tests {
     use crate::types::FactorioVersion;
     use hex_literal::hex;
     use std::fs::File;
-    use std::io::{BufReader, Cursor, Write};
+    use std::io::{BufReader, Cursor};
 
     use indexmap::IndexMap;
 
@@ -269,8 +268,9 @@ mod tests {
 
     #[test]
     fn complex() {
-        let mut reader = BufReader::new(File::open("../test_data/complex-settings.dat").expect("opening file"));
-        let settings = Settings::decode(&mut reader).expect("decoding settings");
+        let mut reader =
+            BufReader::new(File::open("../test_data/complex-settings.dat").expect("opening file"));
+        let _settings = Settings::decode(&mut reader).expect("decoding settings");
     }
 
     fn get_map(prop: &Property) -> &IndexMap<String, Property> {

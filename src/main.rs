@@ -1,7 +1,5 @@
 mod codec;
-mod types;
 mod simple;
+mod types;
 
-fn main() {
-
-}
+fn main() {}
