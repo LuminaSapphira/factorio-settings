@@ -3,6 +3,7 @@ use anyhow::anyhow;
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
 use std::io::{Read, Write};
+use crate::simple::{ModSettings, ModSettingsValue};
 
 const TYPE_NONE: u8 = 0;
 const TYPE_BOOL: u8 = 1;
@@ -160,6 +161,48 @@ pub struct Settings {
 impl Settings {
     pub fn from_reader(reader: &mut impl Read) -> anyhow::Result<Settings> {
         Self::decode(reader)
+    }
+
+    pub fn encode_to_writer(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        self.encode(writer)
+    }
+
+    fn convert_simple_index_map(map: &IndexMap<String, ModSettingsValue>) -> Property {
+        let mut properties = IndexMap::with_capacity(map.len());
+        for (key, value) in map {
+            let prop_value = match value {
+                ModSettingsValue::None => PropertyValue::None,
+                ModSettingsValue::Bool(b) => PropertyValue::Bool(*b),
+                ModSettingsValue::Number(f) => PropertyValue::Number(*f),
+                ModSettingsValue::String(s) => PropertyValue::String(s.clone()),
+                ModSettingsValue::Color { r, g, b, a } => {
+                    let mut color_map = IndexMap::with_capacity(4);
+                    color_map.insert("r".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*r) });
+                    color_map.insert("g".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*g) });
+                    color_map.insert("b".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*b) });
+                    color_map.insert("a".to_owned(), Property { any_flag: false, value: PropertyValue::Number(*a) });
+                    PropertyValue::Dictionary(color_map)
+                }
+            };
+            let mut inner_props_map = IndexMap::with_capacity(1);
+            inner_props_map.insert("value".to_owned(), Property { any_flag: false, value: prop_value });
+            properties.insert(key.clone(), Property { any_flag: false, value: PropertyValue::Dictionary(inner_props_map) });
+        }
+        Property { any_flag: false, value: PropertyValue::Dictionary(properties) }
+    }
+
+    pub fn from_simple(simple: &ModSettings) -> Settings {
+        let startup_properties = Self::convert_simple_index_map(&simple.startup);
+        let runtime_properties = Self::convert_simple_index_map(&simple.runtime_global);
+        let runtime_per_user_properties = Self::convert_simple_index_map(&simple.runtime_per_user);
+
+        let mut root_map = IndexMap::new();
+        root_map.insert("startup".to_owned(), startup_properties);
+        root_map.insert("runtime-global".to_owned(), runtime_properties );
+        root_map.insert("runtime-per-user".to_owned(), runtime_per_user_properties );
+
+        let root = Property { any_flag: false, value: PropertyValue::Dictionary(root_map) };
+        Settings { properties: root, version: simple.factorio_version }
     }
 }
 
