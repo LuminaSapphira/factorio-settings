@@ -1,14 +1,36 @@
+use std::cmp::Ordering;
 use anyhow::anyhow;
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
 use std::io::Read;
 use std::io::Write;
 
+#[derive(Copy, Clone, Eq, PartialEq, Ord)]
 struct FactorioVersion {
     pub major: u16,
     pub minor: u16,
     pub patch: u16,
     pub build: u16,
+}
+
+impl Ord for FactorioVersion {
+    fn cmp(&self, other: &Self) -> Ordering {
+        if self.major == other.major {
+            if self.minor == other.minor {
+                if self.patch == other.patch {
+                    if self.build == other.build { Some(Ordering::Equal)                    }
+                    else if self.build > other.build { Some(Ordering::Greater) }
+                    else if self.build < other.build { Some(Ordering::Less) }
+                }
+                else if self.patch > other.patch { Some(Ordering::Greater) }
+                else if self.patch < other.patch { Some(Ordering::Less) }
+            }
+            else if self.minor > other.minor { Some(Ordering::Greater) }
+            else if self.minor < other.minor { Some(Ordering::Less) }
+        }
+        else if self.major > other.major { Some(Ordering::Greater) }
+        else if self.major < other.major { Some(Ordering::Less) }
+    }
 }
 
 impl Codec for FactorioVersion {
@@ -173,4 +195,18 @@ fn read_optimized_u32(reader: &mut impl Read) -> anyhow::Result<u32> {
         0xff => reader.read_u32::<LE>()?,
         byte => byte as u32,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+    use hex_literal::hex;
+    use crate::{Codec, FactorioVersion};
+
+    #[test]
+    fn debug() {
+        let data = hex!("01 00 01 00 52 00 04 00 00 05 00 03 00 00 00 00 07 73 74 61 72 74 75 70");
+        let mut cursor = Cursor::new(data);
+        let a = FactorioVersion::decode(&mut cursor).expect("factorio version");
+    }
 }
