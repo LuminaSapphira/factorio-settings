@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct FactorioVersion {
@@ -20,22 +20,30 @@ impl Ord for FactorioVersion {
                         Ordering::Greater
                     } else if self.build < other.build {
                         Ordering::Less
-                    } else { unreachable!() }
+                    } else {
+                        unreachable!()
+                    }
                 } else if self.patch > other.patch {
                     Ordering::Greater
                 } else if self.patch < other.patch {
                     Ordering::Less
-                } else { unreachable!() }
+                } else {
+                    unreachable!()
+                }
             } else if self.minor > other.minor {
                 Ordering::Greater
             } else if self.minor < other.minor {
                 Ordering::Less
-            } else { unreachable!() }
+            } else {
+                unreachable!()
+            }
         } else if self.major > other.major {
             Ordering::Greater
         } else if self.major < other.major {
             Ordering::Less
-        } else { unreachable!() }
+        } else {
+            unreachable!()
+        }
     }
 }
 impl PartialOrd for FactorioVersion {
