@@ -52,6 +52,7 @@ pub enum PropertyValue {
 }
 
 impl PropertyValue {
+    #[allow(unused)]
     pub fn as_bool(&self) -> Option<&bool> {
         match self {
             Self::Bool(b) => Some(b),
@@ -59,6 +60,7 @@ impl PropertyValue {
         }
     }
 
+    #[allow(unused)]
     pub fn as_number(&self) -> Option<&f64> {
         match self {
             Self::Number(f) => Some(f),
@@ -66,6 +68,7 @@ impl PropertyValue {
         }
     }
 
+    #[allow(unused)]
     pub fn as_string(&self) -> Option<&String> {
         match self {
             Self::String(s) => Some(s),
@@ -73,6 +76,7 @@ impl PropertyValue {
         }
     }
 
+    #[allow(unused)]
     pub fn as_list(&self) -> Option<&Vec<Property>> {
         match self {
             Self::List(l) => Some(l),
@@ -80,6 +84,7 @@ impl PropertyValue {
         }
     }
 
+    #[allow(unused)]
     pub fn as_dictionary(&self) -> Option<&IndexMap<String, Property>> {
         match self {
             Self::Dictionary(map) => Some(map),

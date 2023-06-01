@@ -11,38 +11,15 @@ pub struct FactorioVersion {
 }
 impl Ord for FactorioVersion {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.major == other.major {
-            if self.minor == other.minor {
-                if self.patch == other.patch {
-                    if self.build == other.build {
-                        Ordering::Equal
-                    } else if self.build > other.build {
-                        Ordering::Greater
-                    } else if self.build < other.build {
-                        Ordering::Less
-                    } else {
-                        unreachable!()
-                    }
-                } else if self.patch > other.patch {
-                    Ordering::Greater
-                } else if self.patch < other.patch {
-                    Ordering::Less
-                } else {
-                    unreachable!()
-                }
-            } else if self.minor > other.minor {
-                Ordering::Greater
-            } else if self.minor < other.minor {
-                Ordering::Less
-            } else {
-                unreachable!()
-            }
-        } else if self.major > other.major {
-            Ordering::Greater
-        } else if self.major < other.major {
-            Ordering::Less
-        } else {
-            unreachable!()
+        match self.major.cmp(&other.major) {
+            Ordering::Equal => match self.minor.cmp(&other.minor) {
+                Ordering::Equal => match self.patch.cmp(&other.patch) {
+                    Ordering::Equal => self.build.cmp(&other.build),
+                    other => other,
+                },
+                other => other,
+            },
+            other => other,
         }
     }
 }

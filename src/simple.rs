@@ -42,7 +42,7 @@ impl TryFrom<&Settings> for ModSettings {
         let runtime_global = property_map_parse(root, "runtime-global")?;
         let runtime_per_user = property_map_parse(root, "runtime-per-user")?;
         Ok(Self {
-            factorio_version: value.version.clone(),
+            factorio_version: value.version,
             startup,
             runtime_global,
             runtime_per_user,
