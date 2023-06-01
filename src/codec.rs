@@ -4,6 +4,13 @@ use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
 use std::io::{Read, Write};
 
+const TYPE_NONE: u8 = 0;
+const TYPE_BOOL: u8 = 1;
+const TYPE_NUMBER: u8 = 2;
+const TYPE_STRING: u8 = 3;
+const TYPE_LIST: u8 = 4;
+const TYPE_DICTIONARY: u8 = 5;
+
 impl Codec for FactorioVersion {
     fn decode(input: &mut impl Read) -> anyhow::Result<FactorioVersion> {
         let [major, minor, patch, build] = {
@@ -89,12 +96,12 @@ impl Codec for Property {
             tree_header
         };
         let value = match vtype {
-            0 => PropertyValue::None,
-            1 => PropertyValue::Bool(Codec::decode(input)?),
-            2 => PropertyValue::Number(Codec::decode(input)?),
-            3 => PropertyValue::String(Codec::decode(input)?),
-            4 => PropertyValue::List(Codec::decode(input)?),
-            5 => PropertyValue::Dictionary(Codec::decode(input)?),
+            TYPE_NONE => PropertyValue::None,
+            TYPE_BOOL => PropertyValue::Bool(Codec::decode(input)?),
+            TYPE_NUMBER => PropertyValue::Number(Codec::decode(input)?),
+            TYPE_STRING => PropertyValue::String(Codec::decode(input)?),
+            TYPE_LIST => PropertyValue::List(Codec::decode(input)?),
+            TYPE_DICTIONARY => PropertyValue::Dictionary(Codec::decode(input)?),
             _ => return Err(anyhow!("Unknown type")),
         };
         Ok(Property {
@@ -103,8 +110,39 @@ impl Codec for Property {
         })
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        match &self.value {
+            PropertyValue::None => {
+                writer.write_u8(TYPE_NONE)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+            }
+            PropertyValue::Bool(b) => {
+                writer.write_u8(TYPE_BOOL)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                b.encode(writer)?;
+            }
+            PropertyValue::Number(num) => {
+                writer.write_u8(TYPE_NUMBER)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                num.encode(writer)?;
+            }
+            PropertyValue::String(string) => {
+                writer.write_u8(TYPE_STRING)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                string.encode(writer)?;
+            }
+            PropertyValue::List(list) => {
+                writer.write_u8(TYPE_LIST)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                list.encode(writer)?;
+            }
+            PropertyValue::Dictionary(dict) => {
+                writer.write_u8(TYPE_DICTIONARY)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                dict.encode(writer)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -133,8 +171,11 @@ impl Codec for Settings {
         })
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        self.version.encode(writer)?;
+        writer.write_u8(0)?;
+        self.properties.encode(writer)?;
+        Ok(())
     }
 }
 
@@ -151,8 +192,9 @@ impl Codec for bool {
             .map_err(anyhow::Error::from)
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        writer.write_u8(*self as u8)?;
+        Ok(())
     }
 }
 
@@ -161,8 +203,9 @@ impl Codec for f64 {
         Ok(reader.read_f64::<LE>()?)
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        writer.write_f64::<LE>(*self)?;
+        Ok(())
     }
 }
 
@@ -180,8 +223,13 @@ impl Codec for String {
         }
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        // if self.is_empty() { writer.write_u8(1)?; }
+        // else { writer.write_u8(0)?; }
+        writer.write_u8(0)?;
+        write_optimized_u32(writer, self.len() as u32)?;
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 }
 
@@ -207,14 +255,24 @@ impl Codec for IndexMap<String, Property> {
         Ok(map)
     }
 
-    fn encode(&self, _writer: &mut impl Write) -> anyhow::Result<()> {
-        todo!()
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        writer.write_u32::<LE>(self.len() as u32)?;
+        for (key, value) in self {
+            key.encode(writer)?;
+            value.encode(writer)?;
+        }
+        Ok(())
     }
 }
 
 #[inline]
 const fn loose_bool(input: u8) -> bool {
     matches!(input, 1)
+}
+
+#[inline]
+const fn loose_bool_byte(input: bool) -> u8 {
+    input as u8
 }
 
 #[inline]
@@ -225,13 +283,24 @@ fn read_optimized_u32(reader: &mut impl Read) -> anyhow::Result<u32> {
     })
 }
 
+#[inline]
+fn write_optimized_u32(writer: &mut impl Write, value: u32) -> anyhow::Result<()> {
+    if value < 0xff {
+        writer.write_u8(value as u8)?;
+    } else {
+        writer.write_u8(0xff)?;
+        writer.write_u32::<LE>(value)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Codec, Property, PropertyValue, Settings};
     use crate::types::FactorioVersion;
     use hex_literal::hex;
     use std::fs::File;
-    use std::io::{BufReader, Cursor};
+    use std::io::{BufReader, BufWriter, Cursor, Read, Write};
 
     use indexmap::IndexMap;
 
@@ -269,8 +338,35 @@ mod tests {
     #[test]
     fn complex() {
         let mut reader =
-            BufReader::new(File::open("../test_data/complex-settings.dat").expect("opening file"));
-        let _settings = Settings::decode(&mut reader).expect("decoding settings");
+            BufReader::new(File::open("test_data/complex-settings.dat").expect("opening file"));
+        Settings::decode(&mut reader).expect("decoding settings");
+    }
+
+    #[test]
+    fn decode_encode_parity() {
+        let mut reader =
+            BufReader::new(File::open("test_data/complex-settings.dat").expect("opening file"));
+        let data = {
+            let mut vec = Vec::with_capacity(90000);
+            reader.read_to_end(&mut vec).expect("Reading file");
+            vec
+        };
+        let mut cursor = Cursor::new(&data);
+        let settings = Settings::decode(&mut cursor).expect("Decoding settings");
+
+        let encoded_data = {
+            let mut vec = Vec::<u8>::with_capacity(data.capacity());
+            let mut cursor = Cursor::new(vec);
+            settings.encode(&mut cursor).expect("Encoding settings");
+            cursor.into_inner()
+        };
+        let mut enc_file = BufWriter::new(
+            File::create("test_output/encoded-data.dat").expect("Creating output file"),
+        );
+        enc_file
+            .write_all(&encoded_data)
+            .expect("Writing encoded data to file");
+        assert_eq!(data, encoded_data);
     }
 
     fn get_map(prop: &Property) -> &IndexMap<String, Property> {
