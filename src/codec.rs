@@ -2,7 +2,6 @@ use crate::types::FactorioVersion;
 use anyhow::anyhow;
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 use indexmap::IndexMap;
-use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 
 impl Codec for FactorioVersion {
@@ -25,23 +24,17 @@ impl Codec for FactorioVersion {
         writer.write_u16::<LE>(self.minor)?;
         writer.write_u16::<LE>(self.patch)?;
         writer.write_u16::<LE>(self.build)?;
-
         Ok(())
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Property {
-    #[serde(skip_serializing_if = "core::ops::Not::not")]
-    #[serde(rename = "$flag")]
     pub any_flag: bool,
-    #[serde(rename = "$value")]
     pub value: PropertyValue,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-// #[serde(tag = "type", content = "content")]
-// #[serde(untagged)]
+#[derive(Clone, Debug)]
 pub enum PropertyValue {
     None,
     Bool(bool),
@@ -49,6 +42,44 @@ pub enum PropertyValue {
     String(String),
     List(Vec<Property>),
     Dictionary(IndexMap<String, Property>),
+}
+
+impl PropertyValue {
+
+    pub fn as_bool(&self) -> Option<&bool> {
+        match self {
+            Self::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+
+    pub fn as_number(&self) -> Option<&f64> {
+        match self {
+            Self::Number(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn as_string(&self) -> Option<&String> {
+        match self {
+            Self::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn as_list(&self) -> Option<&Vec<Property>> {
+        match self {
+            Self::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn as_dictionary(&self) -> Option<&IndexMap<String, Property>> {
+        match self {
+            Self::Dictionary(map) => Some(map),
+            _ => None,
+        }
+    }
 }
 
 impl Codec for Property {
@@ -78,10 +109,16 @@ impl Codec for Property {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Settings {
     pub version: FactorioVersion,
     pub properties: Property,
+}
+
+impl Settings {
+    pub fn from_reader(reader: &mut impl Read) -> anyhow::Result<Settings> {
+        Self::decode(reader)
+    }
 }
 
 impl Codec for Settings {
@@ -232,16 +269,8 @@ mod tests {
 
     #[test]
     fn complex() {
-        let mut reader = BufReader::new(File::open("complex-settings.dat").expect("opening file"));
+        let mut reader = BufReader::new(File::open("../test_data/complex-settings.dat").expect("opening file"));
         let settings = Settings::decode(&mut reader).expect("decoding settings");
-        serde_json::to_writer_pretty(
-            File::create("complex-output.json").expect("creating file"),
-            &settings,
-        )
-        .expect("writing settings");
-        let st = toml::to_string_pretty(&settings).expect("serializing toml");
-        let mut f = File::create("complex-output.toml").expect("creating file");
-        f.write_all(st.as_bytes()).expect("writing file");
     }
 
     fn get_map(prop: &Property) -> &IndexMap<String, Property> {
