@@ -78,13 +78,13 @@ impl TryFrom<&Property> for ModSettingsValue {
                         let r = *dict.get("r")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing r (red) value: {:?}", dict))?
                             .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - r (red) value is not number"))?;
-                        let g = *dict.get("r")
+                        let g = *dict.get("g")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing g (green) value: {:?}", dict))?
                             .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - g (green) value is not number"))?;
-                        let b = *dict.get("r")
+                        let b = *dict.get("b")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing b (blue) value: {:?}", dict))?
                             .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - b (blue) value is not number"))?;
-                        let a = *dict.get("r")
+                        let a = *dict.get("a")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing a (alpha) value: {:?}", dict))?
                             .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - a (alpha) value is not number"))?;
                         Ok(ModSettingsValue::Color { r, g, b, a })
