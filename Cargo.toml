@@ -1,5 +1,8 @@
 [package]
 name = "factorio-settings"
+description = "CLI application to deserialize & reserialize Factorio's mod-settings.dat to JSON or TOML"
+license = "MPL-2"
+repository = "https://github.com/CerulanLumina/factorio-settings"
 version = "1.0.0"
 edition = "2021"
 
