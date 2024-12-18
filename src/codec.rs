@@ -7,10 +7,11 @@ use std::io::{Read, Write};
 
 const TYPE_NONE: u8 = 0;
 const TYPE_BOOL: u8 = 1;
-const TYPE_NUMBER: u8 = 2;
+const TYPE_DOUBLE: u8 = 2;
 const TYPE_STRING: u8 = 3;
 const TYPE_LIST: u8 = 4;
 const TYPE_DICTIONARY: u8 = 5;
+const TYPE_INTEGER: u8 = 6;
 
 impl Codec for FactorioVersion {
     fn decode(input: &mut impl Read) -> anyhow::Result<FactorioVersion> {
@@ -46,10 +47,11 @@ pub struct Property {
 pub enum PropertyValue {
     None,
     Bool(bool),
-    Number(f64),
+    Double(f64),
     String(String),
     List(Vec<Property>),
     Dictionary(IndexMap<String, Property>),
+    Integer(i64),
 }
 
 impl PropertyValue {
@@ -62,9 +64,9 @@ impl PropertyValue {
     }
 
     #[allow(unused)]
-    pub fn as_number(&self) -> Option<&f64> {
+    pub fn as_double(&self) -> Option<&f64> {
         match self {
-            Self::Number(f) => Some(f),
+            Self::Double(f) => Some(f),
             _ => None,
         }
     }
@@ -92,6 +94,14 @@ impl PropertyValue {
             _ => None,
         }
     }
+
+    #[allow(unused)]
+    pub fn as_integer(&self) -> Option<&i64> {
+        match self {
+            Self::Integer(i) => Some(i),
+            _ => None,
+        }
+    }
 }
 
 impl Codec for Property {
@@ -104,11 +114,12 @@ impl Codec for Property {
         let value = match vtype {
             TYPE_NONE => PropertyValue::None,
             TYPE_BOOL => PropertyValue::Bool(Codec::decode(input)?),
-            TYPE_NUMBER => PropertyValue::Number(Codec::decode(input)?),
+            TYPE_DOUBLE => PropertyValue::Double(Codec::decode(input)?),
             TYPE_STRING => PropertyValue::String(Codec::decode(input)?),
             TYPE_LIST => PropertyValue::List(Codec::decode(input)?),
             TYPE_DICTIONARY => PropertyValue::Dictionary(Codec::decode(input)?),
-            _ => return Err(anyhow!("Unknown type")),
+            TYPE_INTEGER => PropertyValue::Integer(Codec::decode(input)?),
+            other => return Err(anyhow!("Unknown type: {:#x}", other)),
         };
         Ok(Property {
             any_flag: loose_bool(any_flag),
@@ -127,8 +138,8 @@ impl Codec for Property {
                 writer.write_u8(loose_bool_byte(self.any_flag))?;
                 b.encode(writer)?;
             }
-            PropertyValue::Number(num) => {
-                writer.write_u8(TYPE_NUMBER)?;
+            PropertyValue::Double(num) => {
+                writer.write_u8(TYPE_DOUBLE)?;
                 writer.write_u8(loose_bool_byte(self.any_flag))?;
                 num.encode(writer)?;
             }
@@ -146,6 +157,11 @@ impl Codec for Property {
                 writer.write_u8(TYPE_DICTIONARY)?;
                 writer.write_u8(loose_bool_byte(self.any_flag))?;
                 dict.encode(writer)?;
+            }
+            PropertyValue::Integer(int) => {
+                writer.write_u8(TYPE_INTEGER)?;
+                writer.write_u8(loose_bool_byte(self.any_flag))?;
+                int.encode(writer)?;
             }
         }
         Ok(())
@@ -173,7 +189,7 @@ impl Settings {
             let prop_value = match value {
                 ModSettingsValue::None => PropertyValue::None,
                 ModSettingsValue::Bool(b) => PropertyValue::Bool(*b),
-                ModSettingsValue::Number(f) => PropertyValue::Number(*f),
+                ModSettingsValue::Double(f) => PropertyValue::Double(*f),
                 ModSettingsValue::String(s) => PropertyValue::String(s.clone()),
                 ModSettingsValue::Color { r, g, b, a } => {
                     let mut color_map = IndexMap::with_capacity(4);
@@ -181,32 +197,33 @@ impl Settings {
                         "r".to_owned(),
                         Property {
                             any_flag: false,
-                            value: PropertyValue::Number(*r),
+                            value: PropertyValue::Double(*r),
                         },
                     );
                     color_map.insert(
                         "g".to_owned(),
                         Property {
                             any_flag: false,
-                            value: PropertyValue::Number(*g),
+                            value: PropertyValue::Double(*g),
                         },
                     );
                     color_map.insert(
                         "b".to_owned(),
                         Property {
                             any_flag: false,
-                            value: PropertyValue::Number(*b),
+                            value: PropertyValue::Double(*b),
                         },
                     );
                     color_map.insert(
                         "a".to_owned(),
                         Property {
                             any_flag: false,
-                            value: PropertyValue::Number(*a),
+                            value: PropertyValue::Double(*a),
                         },
                     );
                     PropertyValue::Dictionary(color_map)
                 }
+                ModSettingsValue::Integer(i) => PropertyValue::Integer(*i),
             };
             let mut inner_props_map = IndexMap::with_capacity(1);
             inner_props_map.insert(
@@ -358,6 +375,17 @@ impl Codec for IndexMap<String, Property> {
     }
 }
 
+impl Codec for i64 {
+    fn decode(reader: &mut impl Read) -> anyhow::Result<Self> {
+        Ok(reader.read_i64::<LE>()?)
+    }
+
+    fn encode(&self, writer: &mut impl Write) -> anyhow::Result<()> {
+        writer.write_i64::<LE>(*self)?;
+        Ok(())
+    }
+}
+
 #[inline]
 const fn loose_bool(input: u8) -> bool {
     matches!(input, 1)
@@ -390,12 +418,13 @@ fn write_optimized_u32(writer: &mut impl Write, value: u32) -> anyhow::Result<()
 #[cfg(test)]
 mod tests {
     use super::{Codec, Property, PropertyValue, Settings};
+    use crate::simple::ModSettings;
     use crate::types::FactorioVersion;
     use hex_literal::hex;
-    use std::fs::File;
-    use std::io::{BufReader, BufWriter, Cursor, Read, Write};
-
     use indexmap::IndexMap;
+    use std::fs::File;
+    use std::io::{BufReader, Cursor, Read};
+    use std::path::Path;
 
     #[test]
     fn simple_encoded() {
@@ -436,9 +465,17 @@ mod tests {
     }
 
     #[test]
-    fn decode_encode_parity() {
-        let mut reader =
-            BufReader::new(File::open("test_data/complex-settings.dat").expect("opening file"));
+    fn decode_encode_parity_1_1() {
+        decode_encode_parity("test_data/complex-settings.dat");
+    }
+
+    #[test]
+    fn decode_encode_parity_2_0() {
+        decode_encode_parity("test_data/settings-2.0.dat");
+    }
+
+    fn decode_encode_parity(file: impl AsRef<Path>) {
+        let mut reader = BufReader::new(File::open(file).expect("opening file"));
         let data = {
             let mut vec = Vec::with_capacity(90000);
             reader.read_to_end(&mut vec).expect("Reading file");
@@ -453,13 +490,15 @@ mod tests {
             settings.encode(&mut cursor).expect("Encoding settings");
             cursor.into_inner()
         };
-        let mut enc_file = BufWriter::new(
-            File::create("test_output/encoded-data.dat").expect("Creating output file"),
-        );
-        enc_file
-            .write_all(&encoded_data)
-            .expect("Writing encoded data to file");
         assert_eq!(data, encoded_data);
+    }
+
+    #[test]
+    fn complex_2_0() {
+        let mut reader =
+            BufReader::new(File::open("test_data/settings-2.0.dat").expect("opening file"));
+        let set = Settings::decode(&mut reader).expect("decoding settings");
+        ModSettings::try_from(&set).expect("to modsettings");
     }
 
     fn get_map(prop: &Property) -> &IndexMap<String, Property> {

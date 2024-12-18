@@ -2,8 +2,8 @@
 name = "factorio-settings"
 description = "CLI application to deserialize & reserialize Factorio's mod-settings.dat to JSON or TOML"
 license = "MPL-2.0"
-repository = "https://github.com/CerulanLumina/factorio-settings"
-version = "1.0.0"
+repository = "https://github.com/LuminaSapphira/factorio-settings"
+version = "1.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,6 +1,5 @@
-use std::cmp::Ordering;
-
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Serialize, Deserialize)]
 pub struct FactorioVersion {

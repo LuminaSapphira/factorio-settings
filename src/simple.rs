@@ -56,9 +56,10 @@ impl TryFrom<&Settings> for ModSettings {
 pub enum ModSettingsValue {
     None,
     Bool(bool),
-    Number(f64),
+    Double(f64),
     String(String),
     Color { r: f64, g: f64, b: f64, a: f64 },
+    Integer(i64),
 }
 
 impl TryFrom<&Property> for ModSettingsValue {
@@ -72,23 +73,24 @@ impl TryFrom<&Property> for ModSettingsValue {
                 ))?;
                 match &value.value {
                     PropertyValue::Bool(b) => Ok(ModSettingsValue::Bool(*b)),
-                    PropertyValue::Number(n) => Ok(ModSettingsValue::Number(*n)),
+                    PropertyValue::Double(n) => Ok(ModSettingsValue::Double(*n)),
                     PropertyValue::String(s) => Ok(ModSettingsValue::String(s.clone())),
                     PropertyValue::Dictionary(dict) => {
                         let r = *dict.get("r")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing r (red) value: {:?}", dict))?
-                            .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - r (red) value is not number"))?;
+                            .value.as_double().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - r (red) value is not number"))?;
                         let g = *dict.get("g")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing g (green) value: {:?}", dict))?
-                            .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - g (green) value is not number"))?;
+                            .value.as_double().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - g (green) value is not number"))?;
                         let b = *dict.get("b")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing b (blue) value: {:?}", dict))?
-                            .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - b (blue) value is not number"))?;
+                            .value.as_double().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - b (blue) value is not number"))?;
                         let a = *dict.get("a")
                             .ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - missing a (alpha) value: {:?}", dict))?
-                            .value.as_number().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - a (alpha) value is not number"))?;
+                            .value.as_double().ok_or(anyhow::anyhow!("Mod setting value is dictionary - assuming color - a (alpha) value is not number"))?;
                         Ok(ModSettingsValue::Color { r, g, b, a })
                     }
+                    PropertyValue::Integer(i) => Ok(ModSettingsValue::Integer(*i)),
                     b => Err(anyhow::anyhow!(
                         "Mod setting value: Invalid type for value parameter: {:?}",
                         b
@@ -113,10 +115,10 @@ mod tests {
     fn serialize_empty() {
         let settings = ModSettings {
             factorio_version: FactorioVersion {
-                major: 1,
-                minor: 1,
-                build: 4,
-                patch: 82,
+                major: 2,
+                minor: 0,
+                build: 26,
+                patch: 2,
             },
             startup: IndexMap::new(),
             runtime_global: IndexMap::new(),
